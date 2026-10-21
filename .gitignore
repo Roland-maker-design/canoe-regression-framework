@@ -14,10 +14,19 @@ logs/
 reports/
 *.log
 
-# ---------- CANoe 生成的报告 / 记录 ----------
+# ---------- CANoe 生成的报告 / 记录 / 编译产物 ----------
 configs/Easy/report*.html
-configs/Easy/*.blf
-configs/Easy/*.mdf
+configs/Easy/report*.xml
+configs/Easy/**/*_report.html
+configs/Easy/**/*_report.xml
+*.blf
+*.mdf
+*.cbf
+
+# ---------- VB 构建产物 ----------
+configs/Easy/VB/**/*.exe
+configs/Easy/VB/**/bin/
+configs/Easy/VB/**/obj/
 
 # ---------- 编辑器 ----------
 .vscode/*
