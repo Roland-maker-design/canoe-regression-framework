@@ -259,6 +259,35 @@ ECU 会记住会话、解锁状态、失败次数和锁定时间。
 S3 标准和冷却时间在真实 ECU 上是秒级。测试里把
 `s3_timeout` / `lock_seconds` 调短后注入，避免测试套件被"真实等待"拖慢。
 
+### 5.6 CANoe 诊断仿真（工具链验证）
+
+项目内置了一条 CANoe 侧的诊断链路，用于验证"工具链视角"下的 UDS：
+
+| 组件 | 配置 |
+|---|---|
+| 诊断描述 | CANoe 自带 `GenericUDS.cdd` |
+| ECU 标识 | `SimEcu` |
+| 传输层 | 请求 `0x7E0` / 响应 `0x7E8` |
+| ECU 仿真节点 | `configs/Easy/Nodes/UdsSimEcu.can` |
+
+使用步骤：
+
+1. 打开 `configs/Easy/Easy.cfg`
+2. `Diagnostics → Diagnostic/ISO TP` → 确认 `SimEcu` 挂在 `easy` 网络
+3. F9 启动测量
+4. `Diagnostics → Diagnostic Console` → 发送 `$10` / `$22`
+
+已实测：
+
+| 请求 | 响应 |
+|---|---|
+| `10 03` | `50 03 00 32 01 F4` |
+| `22 F1 86` | `62 F1 86 03` |
+| `22 F1 96` | `7F 22 31` |
+
+> 该 CAPL 节点用原始单帧实现 UDS，不依赖 CDD，
+> 因此可以独立验证传输层与协议字节。
+
 ## 6. 如何扩展
 
 ### 6.1 加一个新测试用例

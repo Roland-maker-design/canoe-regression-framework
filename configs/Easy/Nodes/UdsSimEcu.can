@@ -1,0 +1,156 @@
+/*----------------------------------------------------------------------------
+ * UdsSimEcu.can
+ *
+ * Minimal UDS responder for the Easy CANoe configuration.
+ * Purpose: let the CANoe Diagnostic Console get a real response.
+ *
+ * Supported (single-frame only, UDS payload <= 7 bytes):
+ *   10 01 / 10 03   -> 50 xx 00 32 01 F4
+ *   3E 00           -> 7E 00
+ *   22 F1 86        -> 62 F1 86 <current session>
+ *   anything else   -> 7F <sid> <nrc>
+ *
+ * Request ID : 0x7E0
+ * Response ID: 0x7E8
+ *----------------------------------------------------------------------------*/
+
+variables
+{
+  int gSession = 1;   /* 1 = default, 3 = extended */
+}
+
+void SendResponse(byte data[], int length)
+{
+  message 0x7E8 msg;
+  int i;
+
+  msg.dlc = 8;
+
+  for (i = 0; i < 8; i++)
+  {
+    msg.byte(i) = 0;
+  }
+  for (i = 0; i < length; i++)
+  {
+    msg.byte(i) = data[i];
+  }
+  output(msg);
+}
+
+void SendNegative(byte sid, byte nrc)
+{
+  byte data[8];
+
+  data[0] = 0x03;
+  data[1] = 0x7F;
+  data[2] = sid;
+  data[3] = nrc;
+  SendResponse(data, 4);
+}
+
+on message 0x7E0
+{
+  byte pci;
+  byte payloadLen;
+  byte sid;
+  byte data[8];
+  long did;
+  long hi;
+
+  pci = this.byte(0);
+
+  /* Only ISO-TP single frames: PCI high nibble must be 0 */
+  if ((pci & 0xF0) != 0x00)
+  {
+    return;
+  }
+
+  payloadLen = pci & 0x0F;
+  if (payloadLen < 1)
+  {
+    return;
+  }
+
+  sid = this.byte(1);
+
+  /* ---- 0x10 DiagnosticSessionControl ---- */
+  if (sid == 0x10)
+  {
+    if (payloadLen < 2)
+    {
+      SendNegative(0x10, 0x13);
+      return;
+    }
+    if (this.byte(2) != 0x01 && this.byte(2) != 0x03)
+    {
+      SendNegative(0x10, 0x12);
+      return;
+    }
+
+    gSession = this.byte(2);
+
+    data[0] = 0x06;
+    data[1] = 0x50;
+    data[2] = this.byte(2);
+    data[3] = 0x00;
+    data[4] = 0x32;
+    data[5] = 0x01;
+    data[6] = 0xF4;
+    SendResponse(data, 7);
+    return;
+  }
+
+  /* ---- 0x3E TesterPresent ---- */
+  if (sid == 0x3E)
+  {
+    if (payloadLen < 2)
+    {
+      SendNegative(0x3E, 0x13);
+      return;
+    }
+    if ((this.byte(2) & 0x7F) != 0x00)
+    {
+      SendNegative(0x3E, 0x12);
+      return;
+    }
+
+    data[0] = 0x02;
+    data[1] = 0x7E;
+    data[2] = 0x00;
+    SendResponse(data, 3);
+    return;
+  }
+
+  /* ---- 0x22 ReadDataByIdentifier ---- */
+  if (sid == 0x22)
+  {
+    if (payloadLen < 3)
+    {
+      SendNegative(0x22, 0x13);
+      return;
+    }
+
+    /* CAPL 的 byte 是 8 位，直接 << 8 会溢出。
+       先存进 long，再用乘 256 拼高低字节。 */
+    hi = this.byte(2);
+    did = hi * 256 + this.byte(3);
+
+    if (did == 0xF186)
+    {
+      data[0] = 0x04;
+      data[1] = 0x62;
+      data[2] = 0xF1;
+      data[3] = 0x86;
+      data[4] = gSession;
+      SendResponse(data, 5);
+    }
+    else
+    {
+      SendNegative(0x22, 0x31);
+    }
+    return;
+  }
+
+  /* ---- anything else ---- */
+  SendNegative(sid, 0x11);
+}
