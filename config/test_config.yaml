@@ -1,0 +1,19 @@
+﻿# CANoe 相关
+canoe:
+  config_path: "configs/Easy/Easy.cfg"        # 找：D:\Test\CANoeAutoTest\tests\conftest.py 的 CONFIG_PATH
+  visible: true            # 找：src\canoe_controller.py，__init__ 的默认参数
+
+# 各种等待超时（秒）
+timeouts:
+  measurement: 5.0        # 找：canoe_controller.py 的 start_measurement(timeout=?)
+  sysvar: 5.0             # 找：wait_for_sysvar 的 timeout 默认值
+  poll_interval: 0.02      # 找：wait_for_sysvar 的 interval 默认值
+
+# 判定阈值
+thresholds:
+  max_response_ms: 200    # 找：tests\test_response_time.py 里的常量
+
+# 日志
+logging:
+  level: INFO              # 你想要多啰嗦？DEBUG最啰嗦，排查问题 / INFO / WARNING/ERROR最安静，生产环境用/CRITICAL
+  log_dir: logs

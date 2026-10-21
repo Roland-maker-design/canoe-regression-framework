@@ -1,0 +1,37 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# ---------- 虚拟环境 ----------
+.venv/
+venv/
+
+# ---------- 运行时产物 ----------
+logs/
+reports/
+*.log
+
+# ---------- CANoe 生成的报告 / 记录 ----------
+configs/Easy/report*.html
+configs/Easy/*.blf
+configs/Easy/*.mdf
+
+# ---------- 编辑器 ----------
+.vscode/*
+!.vscode/settings.json
+.idea/
+
+# ---------- 系统文件 ----------
+Thumbs.db
+.DS_Store
+
+# ---------- 临时文件 ----------
+*.tmp
+*.bak
+
+# ---------- 个人资料 / 交接文档（不入库） ----------
+HANDOVER.md
+笔记.txt

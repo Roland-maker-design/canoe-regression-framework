@@ -1,0 +1,74 @@
+/*@!Encoding:936*/
+variables 
+{
+    message EngineState msgEngine;
+    msTimer tInject;
+    int gInjectOn = 0;
+}
+
+void SetInjection(int enable)
+{
+  gInjectOn = enable;
+  if (gInjectOn)
+  {
+    write("故障注入 ON：每 20ms 发一帧 20000 rpm");
+    setTimer(tInject, 20);
+  }
+  else
+  {
+    cancelTimer(tInject);
+    write("故障注入 OFF");
+  }
+}
+
+on sysvar sysvar::Engine::EngineStateSwitch
+{
+ $EngineState::OnOff = @this;
+  if(@this)
+    $EngineState::EngineSpeed = @sysvar::Engine::EngineSpeedEntry;
+  else
+    $EngineState::EngineSpeed = 0;
+}
+
+on sysvar sysvar::Engine::EngineSpeedEntry
+{
+  if(@sysvar::Engine::EngineStateSwitch) 
+  {
+    $EngineState::EngineSpeed = @this;
+    write("转速输入 = %f，已写入报文", @this);
+  }
+}
+
+on key '5'
+{
+  msgEngine.OnOff = 1;
+  msgEngine.EngineSpeed = 3300.0;
+  output(msgEngine);
+  write("手动发送一帧 EngineState, 转速 = 3300");
+}
+
+on message EngineState
+{
+  if (this.dir == TX && this.EngineSpeed > 3000)
+  {
+    write("★ TX 抓到 3300！");
+  }
+}
+
+on key '6'
+{
+  SetInjection(1 - gInjectOn);
+}
+
+/* Python：写系统变量也能开 */
+on sysvar sysvar::Test::FaultInject
+{
+  SetInjection(@this);
+}
+on timer tInject
+{
+  msgEngine.OnOff = 1;
+  msgEngine.EngineSpeed = 12000.0;
+  output(msgEngine);
+  setTimer(tInject, 20);
+}

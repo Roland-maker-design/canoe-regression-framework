@@ -1,0 +1,92 @@
+/*@!Encoding:936*/
+variables
+{
+  // 本模块暂时不需要全局变量
+}
+
+/* ===== 总入口：按顺序执行所有用例 ===== */
+void MainTest()
+{
+  TestModuleTitle("Easy 工程 CAPL 测试模块");
+  TestModuleDescription("验证发动机转速从系统变量到仪表的完整链路");
+
+  TC_EngineSpeed_1000();
+  TC_EngineSpeed_2500();
+  TC_EngineOff_ClearsSpeed();   // ← 这个留给你写
+}
+
+/* ===== 用例 1：1000 rpm → 仪表 1.0 ===== */
+testcase TC_EngineSpeed_1000()
+{
+  TestCaseTitle("发动机转速", "设定 1000 rpm，仪表应显示 1.0");
+
+  TestStep("准备", "点火打开，转速输入 1000");
+  @sysvar::Engine::EngineStateSwitch = 1;
+  @sysvar::Engine::EngineSpeedEntry = 1000.0;
+
+  TestStep("检查", "等待仪表变为 1.0（最长 1000ms）");
+  if (testWaitForSignalMatch(sysvar::Engine::EngineSpeedDspMeter, 1.0, 1000) == 1)
+  {
+    TestStepPass("检查", "仪表显示 1.0");
+  }
+  else
+  {
+    TestStepFail("检查", "仪表没有变成 1.0");
+  }
+
+  @sysvar::Engine::EngineSpeedEntry = 0.0;
+  @sysvar::Engine::EngineStateSwitch = 0;
+}
+
+/* ===== 用例 2：2500 rpm → 仪表 2.5 ===== */
+testcase TC_EngineSpeed_2500()
+{
+  TestCaseTitle("发动机转速", "设定 2500 rpm，仪表应显示 2.5");
+
+  TestStep("准备", "点火打开，转速输入 2500");
+  @sysvar::Engine::EngineStateSwitch = 1;
+  @sysvar::Engine::EngineSpeedEntry = 2500.0;
+
+  TestWaitForTimeout(300);
+
+  TestStep("检查", "读取仪表值");
+  if (@sysvar::Engine::EngineSpeedDspMeter == 2.5)
+  {
+    TestStepPass("检查", "仪表显示 2.5");
+  }
+  else
+  {
+    TestStepFail("检查", "仪表显示 %f，期望 2.5",
+                 @sysvar::Engine::EngineSpeedDspMeter);
+  }
+
+  @sysvar::Engine::EngineSpeedEntry = 0.0;
+  @sysvar::Engine::EngineStateSwitch = 0;
+}
+
+/* ===== 用例 3：你来写 ===== */
+testcase TC_EngineOff_ClearsSpeed()
+{
+  TestCaseTitle("发动机关闭", "关闭点火后，仪表应归零");
+
+  TestStep("准备", "点火打开，转速 2500");
+  @sysvar::Engine::EngineStateSwitch = 1;
+  @sysvar::Engine::EngineSpeedEntry = 2500.0;
+  testWaitForSignalMatch(sysvar::Engine::EngineSpeedDspMeter, 2.5, 1000);
+
+  TestStep("关闭点火", "EngineStateSwitch = 0");
+  @sysvar::Engine::EngineStateSwitch = 0;
+
+  TestStep("检查", "等待仪表归零");
+  if (testWaitForSignalMatch(sysvar::Engine::EngineSpeedDspMeter, 0.0, 1000) == 1)
+  {
+    TestStepPass("检查", "仪表已归零");
+  }
+  else
+  {
+    TestStepFail("检查", "仪表没有归零，当前值 %f",
+                 @sysvar::Engine::EngineSpeedDspMeter);
+  }
+
+  @sysvar::Engine::EngineSpeedEntry = 0.0;
+}

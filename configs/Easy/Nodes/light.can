@@ -1,0 +1,99 @@
+/*@!Encoding:936*/
+variables 
+{
+  msTimer tFlashLightFrequency;//设置定时�?
+  const int gFlashLightFrequency = 200;//设置常驻频率200ms
+  int gHazardLightsStatus = 0;//设置危险灯初始为0 
+  int gCurrentPeriod=1000;
+//以下为变量声�?
+  int gDebugCounterTX = 0;
+  int gDebugCounterTXRQ = 0;
+  int gDebugCounterRX = 0;
+}
+
+on start//在start事件�?
+{
+   setWriteDbgLevel(0); // set DbgLevel = 1 to get more information in Write-Window
+                            //设置DbgLevel=1获得更多的信息在write窗口
+}
+
+on message LightState //在lightstate事件的信息格�?
+{
+ 
+  if (this.dir == TX)//如果报文方向往TX
+  {
+    gDebugCounterTX++;//TX变量+1
+    if(gDebugCounterTX == 10)//如果TX=10
+    {
+      writeDbgLevel(1,"LightState TX received by node %NODE_NAME%");//调用writeDbgLevel函数�?参是按键按下的比�?就会输出后面这句�?
+      gDebugCounterTX = 0;//将TX�?
+    }     
+  }
+  if(this.dir == TXREQUEST)//如果报文方向往request�?
+  {
+    gDebugCounterTXRQ++;//request+1
+    if(gDebugCounterTXRQ == 10)//若TXRQ=10
+    {
+      writeDbgLevel(1,"LightState TXREQUEST received by node %NODE_NAME%");//调用write函数根据类型按下的按键是1所以匹配上了输出后续内�?
+      gDebugCounterTXRQ = 0;
+    } 
+  }
+  if (this.dir == RX)
+  {
+    gDebugCounterRX++;
+    if(gDebugCounterRX == 10)
+    {
+      writeDbgLevel(1,"Error: LightState RX received by node %NODE_NAME%");
+      gDebugCounterRX = 0;
+    }
+  }
+}
+
+on timer tFlashLightFrequency//在时间时间中，也就是定时器时间到�?
+{
+  gHazardLightsStatus = (gHazardLightsStatus == 1 ? 0 : 1);
+  $LightState::FlashLight = gHazardLightsStatus;
+  setTimer(this, gCurrentPeriod);
+  write("TOGGLE -> %d", gHazardLightsStatus);
+
+}
+
+on key '0'
+{
+  setwriteDbgLevel(0);
+}
+
+on key '1'
+{
+  setwriteDbgLevel(1);
+}
+
+on key'3'
+{
+  
+  if (gCurrentPeriod==1000) {
+    gCurrentPeriod=50;
+    write("KEY 3 �յ������� = %d", gCurrentPeriod);
+  }
+  else{
+    gCurrentPeriod=1000;
+    write("KEY 3 �յ������� = %d", gCurrentPeriod);
+  }
+  
+}
+on sysvar sysvar::Lights::HazardLightsSwitch
+{
+  if (@this)
+  {
+    gHazardLightsStatus = 1;
+    setTimer(tFlashLightFrequency, gCurrentPeriod);
+  }
+  else
+  {
+    cancelTimer(tFlashLightFrequency);
+    gHazardLightsStatus = 0;
+  }
+
+  $LightState::FlashLight = gHazardLightsStatus;
+}
+
