@@ -19,6 +19,7 @@ configs/Easy/report*.html
 configs/Easy/report*.xml
 configs/Easy/**/*_report.html
 configs/Easy/**/*_report.xml
+configs/Easy/*.stcfg
 *.blf
 *.mdf
 *.cbf
@@ -40,6 +41,10 @@ Thumbs.db
 # ---------- 临时文件 ----------
 *.tmp
 *.bak
+
+# ---------- 学习练习 / 个人工具（不入库） ----------
+exercises/
+tools/
 
 # ---------- 个人资料 / 交接文档（不入库） ----------
 HANDOVER.md
