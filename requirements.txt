@@ -29,8 +29,10 @@ pytest-repeat>=0.9
 PyYAML>=6.0
 colorlog>=6.8
 
+# ---------- UDS 诊断（uds_tests/ 与 uds/ 需要） ----------
+python-can>=4.6
+can-isotp>=2.0
+udsoncan>=1.26
+
 # ---------- 开发工具 ----------
 ruff>=0.17
-
-# ---------- 后续计划（暂时未使用） ----------
-# udsoncan>=1.2

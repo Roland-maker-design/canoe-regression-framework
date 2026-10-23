@@ -48,7 +48,7 @@ python -m pytest uds_tests
 canoe-regression-framework/
 ├── README.md                    项目说明（本文件）
 ├── requirements.txt             依赖清单（含 Python 版本要求）
-├── pytest.ini                   pytest 配置：标签 / 超时 / 自动生成报告
+├── pytest.ini                   pytest 配置：testpaths / pythonpath / 标签 / 超时 / 日志级别
 │
 ├── config/
 │   └── test_config.yaml         唯一配置来源：工程路径 / 超时 / 阈值 / 日志级别
@@ -65,21 +65,26 @@ canoe-regression-framework/
 │   ├── test_engine.py           功能测试（5 个）
 │   ├── test_engine_param.py     参数化测试（8 个）
 │   ├── test_response_time.py    响应时间性能测试（3 个）
-│   └── test_contract.py         接口契约测试（3 个）
+│   ├── test_contract.py         接口契约测试（3 个）
+│   └── test_fault_injection.py  故障注入测试（2 个，含 1 个 xfail）
 │
 ├── configs/
 │   └── Easy/                    CANoe 工程副本（被测对象）
 │       ├── Easy.cfg
 │       ├── CANdb/easy.dbc
-│       └── Nodes/*.can
+│       ├── Nodes/*.can          仿真节点（含诊断仿真 UdsSimEcu.can）
+│       └── Test/*.can           CAPL Test Module（含 DiagTestModule.can）
 │
 ├── uds/                         UDS 协议实现与 ECU 模拟器
+│   ├── u0_first_frame.py        第一帧：手工拼单帧请求
 │   ├── u1_session_machine.py    会话状态机：会话切换 / S3 超时 / NRC
+│   ├── u1_exercise.py           练习：状态机
 │   ├── u2_isotp_multiframe.py   ISO-TP 分片演示：SF/FF/CF/FC
 │   ├── u3_security_access.py    0x27 安全访问：种子 / 密钥 / 锁定
+│   ├── u3_exercise.py           练习：安全访问
+│   ├── u4_simple.py             最简串行版 ECU
 │   ├── u4_ecu_simulator.py      ECU 模拟器：跑在 CAN 总线上
-│   ├── u5_udsoncan_demo.py      udsoncan 演示
-│   └── u*_exercise.py           练习题与对账脚本
+│   └── u5_udsoncan_demo.py      udsoncan 演示
 │
 ├── uds_tests/                   UDS 诊断自动化用例（不依赖 CANoe）
 │   ├── conftest.py              ECU + udsoncan 夹具
@@ -101,7 +106,7 @@ canoe-regression-framework/
 |---|---|---|
 | `framework/` | `__init__.py` / `logger.py` / `config_loader.py` / `canoe_controller.py`（4 个文件） | **0 行** |
 | `config/` | `test_config.yaml` | 改 `canoe.config_path` 一行 |
-| `tests/` | `conftest.py` + 5 个 `test_*.py` | **全部要重写** |
+| `tests/` | `conftest.py` + 6 个 `test_*.py` | **全部要重写** |
 
 三条理由：
 
@@ -150,7 +155,7 @@ canoe-regression-framework/
 **实测数字：**
 
 - CANoe 冷启动约 **7.4 秒**
-- 22 个用例，若每个用例都连一次：7.4 × 22 ≈ **2.7 分钟**
+- 24 个用例，若每个用例都连一次：7.4 × 24 ≈ **3.0 分钟**
 - 用 `scope="session"`：整个测试会话只连 **1 次**
 
 两条理由：
@@ -158,12 +163,13 @@ canoe-regression-framework/
 1. **初始化开销不可接受** —— 2.7 分钟里 2.6 分钟都在等连接
 2. **CANoe 是单例资源** —— 同一台机器只能有一个 CANoe 实例，反复连/断容易留下脏状态
 
-**实测整套耗时（22 个用例）：**
+**实测整套耗时（24 个用例）：**
 
 | 场景 | 耗时 |
 |---|---|
-| CANoe 已在运行（热） | 约 **2.7 秒** |
-| CANoe 刚启动（冷） | 约 **14.6 秒** |
+| CANoe 已在运行（热） | 约 **2.7 秒**（22 用例时实测） |
+| CANoe 刚启动（冷） | 约 **14.6 秒**（22 用例时实测） |
+| 2026-10-23 实测（首次连接 9.3 秒） | **16.39 秒** |
 
 > 冷热差异约 5 倍 —— 这也是为什么看测试耗时前，要先确认 CANoe 的状态。
 
@@ -269,6 +275,7 @@ S3 标准和冷却时间在真实 ECU 上是秒级。测试里把
 | ECU 标识 | `SimEcu` |
 | 传输层 | 请求 `0x7E0` / 响应 `0x7E8` |
 | ECU 仿真节点 | `configs/Easy/Nodes/UdsSimEcu.can` |
+| CAPL Test Module | `configs/Easy/Test/DiagTestModule.can`（已入库，**尚未在 CANoe 中运行验证**） |
 
 使用步骤：
 
@@ -359,9 +366,9 @@ cd D:\Test\canoe-regression-framework
 
 | 命令 | 说明 |
 |---|---|
-| `ruff check tests\ framework\` | 检查代码规范 |
-| `ruff check tests\ framework\ --diff` | 只显示会改什么，不动文件 |
-| `ruff check tests\ framework\ --fix` | 自动修复 |
+| `ruff check tests\ framework\ uds\ uds_tests\` | 检查代码规范 |
+| `ruff check tests\ framework\ uds\ uds_tests\ --diff` | 只显示会改什么，不动文件 |
+| `ruff check tests\ framework\ uds\ uds_tests\ --fix` | 自动修复 |
 
 ### 调试
 
