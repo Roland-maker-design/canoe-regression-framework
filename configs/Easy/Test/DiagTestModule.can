@@ -1,13 +1,54 @@
 /*----------------------------------------------------------------------------
  * DiagTestModule.can
  *
- * CAPL Test Module for UDS diagnostics.
- * Uses the symbols generated from GenericUDS.cdd:
- *   SimEcu.DiagnosticSessionControl_Process
- *   SimEcu.ReadDataByIdentifier_Process
+ * CAPL test module for UDS diagnostics.
+ * Target ECU: Nodes/UdsSimEcu.can   (request 0x7E0 / response 0x7E8)
  *
- * This is the CAPL counterpart of the Python tests in uds_tests/.
+ * How the checks work:
+ *   1. diagSendRequest() sends the request through CANoe's diagnostic layer.
+ *   2. on message 0x7E8 captures the raw response frame.
+ *   3. The testcase asserts on the raw bytes, not just "a response arrived".
+ *
+ * Response frame layout (ISO-TP single frame):
+ *   byte 0 = PCI (payload length)
+ *   byte 1.. = UDS payload
+ *
+ * Expected frames (from UdsSimEcu.can):
+ *   10 03      -> 06 50 03 00 32 01 F4
+ *   22 F1 86   -> 04 62 F1 86 <session>
+ *   22 F1 96   -> 03 7F 22 31
  *----------------------------------------------------------------------------*/
+
+variables
+{
+  byte gResp[8];        /* last response frame, raw bytes             */
+  int  gRespCnt = 0;    /* how many responses seen so far             */
+
+  diagRequest SimEcu.DiagnosticSessionControl_Process gSessionReq;
+  diagRequest SimEcu.ReadDataByIdentifier_Process     gReadReq;
+}
+
+/* Capture every raw frame on the response ID and log it. */
+on message 0x7E8
+{
+  int i;
+
+  gRespCnt++;
+  for (i = 0; i < 8; i++)
+  {
+    if (i < this.dlc)
+    {
+      gResp[i] = this.byte(i);
+    }
+    else
+    {
+      gResp[i] = 0;
+    }
+  }
+  write("RX 0x7E8: %X %X %X %X %X %X %X %X",
+        gResp[0], gResp[1], gResp[2], gResp[3],
+        gResp[4], gResp[5], gResp[6], gResp[7]);
+}
 
 void MainTest()
 {
@@ -16,56 +57,125 @@ void MainTest()
   TC_Diag_Read_Unknown_DID();
 }
 
+/*--------------------------------------------------------------
+ * 10 03 -> expect 50 03
+ *-------------------------------------------------------------*/
 testcase TC_Diag_Session_Extended()
 {
-  diagRequest SimEcu.DiagnosticSessionControl_Process req;
+  int  cntBefore;
+  long waited;
 
-  TestStep("1", "Send 10 03 (extended session)");
-  req.SetParameter("DiagnosticSessionType", 0x03);
-  diagSendRequest(req);
+  TestCaseTitle("Session control", "10 03 must return 50 03");
 
-  if (testWaitForDiagResponse(req, 2000) == 1)
+  cntBefore = gRespCnt;
+
+  TestStep("send", "10 03");
+  gSessionReq.SetParameter("diagnosticSessionType", 0x03);
+  diagSendRequest(gSessionReq);
+
+  TestStep("wait", "response within 2000 ms");
+  waited = 0;
+  while (gRespCnt == cntBefore && waited < 2000)
   {
-    TestStepPass("2", "Response received");
+    testWaitForTimeout(10);
+    waited += 10;
+  }
+
+  if (gRespCnt == cntBefore)
+  {
+    TestStepFail("verify", "No response within 2000 ms");
+  }
+  else if (gResp[1] == 0x50 && gResp[2] == 0x03)
+  {
+    TestStepPass("verify", "Positive response 50 03");
   }
   else
   {
-    TestStepFail("2", "No response within 2000 ms");
+    TestStepFail("verify", "Unexpected bytes: %X %X", gResp[1], gResp[2]);
   }
 }
 
+/*--------------------------------------------------------------
+ * 22 F1 86 -> expect 62 F1 86 <session>
+ *-------------------------------------------------------------*/
 testcase TC_Diag_Read_Session_DID()
 {
-  diagRequest SimEcu.ReadDataByIdentifier_Process req;
+  int  cntBefore;
+  long waited;
 
-  TestStep("1", "Send 22 F1 86");
-  req.SetParameter("DataIdentifier", 0xF186);
-  diagSendRequest(req);
+  TestCaseTitle("Read DID", "22 F1 86 must return 62 F1 86 <session>");
 
-  if (testWaitForDiagResponse(req, 2000) == 1)
+  cntBefore = gRespCnt;
+
+  TestStep("send", "22 F1 86");
+  gReadReq.SetParameter("dataIdentifier", 0xF186);
+  diagSendRequest(gReadReq);
+
+  TestStep("wait", "response within 2000 ms");
+  waited = 0;
+  while (gRespCnt == cntBefore && waited < 2000)
   {
-    TestStepPass("2", "Response received");
+    testWaitForTimeout(10);
+    waited += 10;
+  }
+
+  if (gRespCnt == cntBefore)
+  {
+    TestStepFail("verify", "No response within 2000 ms");
+  }
+  else if (gResp[1] == 0x62 && gResp[2] == 0xF1 && gResp[3] == 0x86)
+  {
+    TestStepPass("verify", "Positive response 62 F1 86, session = %X", gResp[4]);
+  }
+  else if (gResp[1] == 0x7F)
+  {
+    TestStepFail("verify", "Negative response, NRC = %X", gResp[3]);
   }
   else
   {
-    TestStepFail("2", "No response within 2000 ms");
+    TestStepFail("verify", "Unexpected bytes: %X %X %X", gResp[1], gResp[2], gResp[3]);
   }
 }
 
+/*--------------------------------------------------------------
+ * 22 F1 96 -> expect negative response 7F 22 31
+ *-------------------------------------------------------------*/
 testcase TC_Diag_Read_Unknown_DID()
 {
-  diagRequest SimEcu.ReadDataByIdentifier_Process req;
+  int  cntBefore;
+  long waited;
 
-  TestStep("1", "Send 22 F1 96 (unsupported DID)");
-  req.SetParameter("DataIdentifier", 0xF196);
-  diagSendRequest(req);
+  TestCaseTitle("Read unknown DID", "22 F1 96 must return 7F 22 31");
 
-  if (testWaitForDiagResponse(req, 2000) == 1)
+  cntBefore = gRespCnt;
+
+  TestStep("send", "22 F1 96");
+  gReadReq.SetParameter("dataIdentifier", 0xF196);
+  diagSendRequest(gReadReq);
+
+  TestStep("wait", "response within 2000 ms");
+  waited = 0;
+  while (gRespCnt == cntBefore && waited < 2000)
   {
-    TestStepPass("2", "Response received (negative response is expected)");
+    testWaitForTimeout(10);
+    waited += 10;
+  }
+
+  if (gRespCnt == cntBefore)
+  {
+    TestStepFail("verify", "No response within 2000 ms");
+  }
+  else if (gResp[1] == 0x7F && gResp[2] == 0x22 && gResp[3] == 0x31)
+  {
+    TestStepPass("verify", "Negative response 7F 22 31 as expected");
+  }
+  else if (gResp[1] == 0x7F)
+  {
+    TestStepFail("verify", "Negative response, but NRC = %X (expected 31)", gResp[3]);
   }
   else
   {
-    TestStepFail("2", "No response within 2000 ms");
+    TestStepFail("verify", "Expected negative response, got: %X %X %X",
+                 gResp[1], gResp[2], gResp[3]);
   }
 }
