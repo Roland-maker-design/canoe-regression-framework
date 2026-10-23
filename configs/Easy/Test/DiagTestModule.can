@@ -1,0 +1,71 @@
+/*----------------------------------------------------------------------------
+ * DiagTestModule.can
+ *
+ * CAPL Test Module for UDS diagnostics.
+ * Uses the symbols generated from GenericUDS.cdd:
+ *   SimEcu.DiagnosticSessionControl_Process
+ *   SimEcu.ReadDataByIdentifier_Process
+ *
+ * This is the CAPL counterpart of the Python tests in uds_tests/.
+ *----------------------------------------------------------------------------*/
+
+void MainTest()
+{
+  TC_Diag_Session_Extended();
+  TC_Diag_Read_Session_DID();
+  TC_Diag_Read_Unknown_DID();
+}
+
+testcase TC_Diag_Session_Extended()
+{
+  diagRequest SimEcu.DiagnosticSessionControl_Process req;
+
+  TestStep("1", "Send 10 03 (extended session)");
+  req.SetParameter("DiagnosticSessionType", 0x03);
+  diagSendRequest(req);
+
+  if (testWaitForDiagResponse(req, 2000) == 1)
+  {
+    TestStepPass("2", "Response received");
+  }
+  else
+  {
+    TestStepFail("2", "No response within 2000 ms");
+  }
+}
+
+testcase TC_Diag_Read_Session_DID()
+{
+  diagRequest SimEcu.ReadDataByIdentifier_Process req;
+
+  TestStep("1", "Send 22 F1 86");
+  req.SetParameter("DataIdentifier", 0xF186);
+  diagSendRequest(req);
+
+  if (testWaitForDiagResponse(req, 2000) == 1)
+  {
+    TestStepPass("2", "Response received");
+  }
+  else
+  {
+    TestStepFail("2", "No response within 2000 ms");
+  }
+}
+
+testcase TC_Diag_Read_Unknown_DID()
+{
+  diagRequest SimEcu.ReadDataByIdentifier_Process req;
+
+  TestStep("1", "Send 22 F1 96 (unsupported DID)");
+  req.SetParameter("DataIdentifier", 0xF196);
+  diagSendRequest(req);
+
+  if (testWaitForDiagResponse(req, 2000) == 1)
+  {
+    TestStepPass("2", "Response received (negative response is expected)");
+  }
+  else
+  {
+    TestStepFail("2", "No response within 2000 ms");
+  }
+}
