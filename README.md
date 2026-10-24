@@ -1,5 +1,7 @@
 # CANoe + Python 自动化测试框架
 
+[![CI](https://github.com/Roland-maker-design/canoe-regression-framework/actions/workflows/ci.yml/badge.svg)](https://github.com/Roland-maker-design/canoe-regression-framework/actions/workflows/ci.yml)
+
 > 两条测试主线：
 > 1. **CANoe 总线测试**：通过 COM 接口控制 CANoe，读写系统变量，验证仪表响应
 > 2. **UDS 诊断测试**：在虚拟 CAN 总线上用 `udsoncan` 发送诊断请求，验证会话、安全访问与负向路径
@@ -378,3 +380,27 @@ cd D:\Test\canoe-regression-framework
 | `python -m pytest --log-cli-level=DEBUG` | 临时查看 DEBUG 级别日志 |
 | `python -m pytest --markers` | 列出所有已注册标签 |
 | `python -m pytest --fixtures` | 列出所有可用 fixture |
+
+## 8. 持续集成（GitHub Actions）
+
+推送或提 PR 时自动运行 `.github/workflows/ci.yml`：
+
+| Job | 内容 | 说明 |
+|---|---|---|
+| 静态检查 | `ruff check --select E9,F63,F7,F82` | 只查语法错误与未定义名称，不阻塞代码风格 |
+| UDS 用例（3.10 / 3.11） | `pytest uds_tests` | 虚拟总线，不依赖 CANoe 与硬件 |
+
+每次运行会把 HTML 报告作为 artifact 上传（`uds-report-py3.10` / `uds-report-py3.11`）。
+
+### 为什么 `tests/` 不在 CI 里跑？
+
+`tests/` 通过 COM 控制 CANoe，需要 **Windows + CANoe 许可证**，GitHub 托管 runner 上没有这些。
+所以 CI 只覆盖不依赖专用硬件的协议测试。这不是妥协，而是分层：
+
+| 层级 | 跑什么 | 在哪跑 |
+|---|---|---|
+| 协议 / 单元 | `uds_tests`（18 条） | CI，每次提交 |
+| 集成 / 系统 | `tests`（24 条，需 CANoe） | 本地 / HIL 机 |
+
+> 同理，`requirements.txt` 里 `pywin32` 加了 `sys_platform == "win32"` 标记，
+> 否则 Linux runner 上装不上这个 Windows-only 包。
